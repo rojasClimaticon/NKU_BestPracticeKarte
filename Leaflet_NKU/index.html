@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NKU Best-Practice Karte</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { width: 100%; height: 100vh; }
+
+        /* Style for the icons in the layer control */
+        .leaflet-control-layers label span {
+            display: inline-block;
+            width: 25px; /* Adjust size to match your icons */
+            height: 25px;
+            vertical-align: middle;
+            background-size: contain;
+            background-repeat: no-repeat;
+            margin-right: 8px; /* Space between the icon and the text */
+        }
+
+        /* Adjust the width of the layer control box */
+        .leaflet-control-layers {
+            width: 300px; /* Set your desired width here */
+        }
+
+        /* Ensure the label text wraps properly and doesn't overlap */
+        .leaflet-control-layers-overlays label,
+        .leaflet-control-layers-base label {
+            white-space: nowrap; /* Prevent text from wrapping to the next line */
+            padding-right: 10px; /* Adds padding to the right for better spacing */
+            line-height: 25px; /* Match this with the height of the icon for better alignment */
+        }
+
+        /* Ensure that the entire label (icon + text) is properly aligned */
+        .leaflet-control-layers-base label,
+        .leaflet-control-layers-overlays label {
+            display: flex; /* Use flexbox for better alignment */
+            align-items: center; /* Vertically center align the icon and text */
+        }
+
+        /* Optionally add some space between each item in the control box */
+        .leaflet-control-layers-base label,
+        .leaflet-control-layers-overlays label {
+            margin-bottom: 5px; /* Adjust the spacing between each layer item */
+        }
+
+        /* Style for pop-up images */
+        .leaflet-popup img {
+            max-width: 200px; /* Adjust as needed */
+            height: auto;
+        }
+
+        /* Style for pop-up links */
+        .leaflet-popup a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        .leaflet-popup a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script src="https://unpkg.com/esri-leaflet"></script>
+    <script src="https://unpkg.com/esri-leaflet-attachments"></script>
+
+    <script>
+        // Initialize the map
+        var map = L.map('map').setView([51.5883, 7.6590], 8);
+
+        // Base layers
+
+        var Stadia_AlidadeSmooth = L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.{ext}', {
+		attribution: '&copy; <a href="https://www.stadiamaps.com/" target="_blank">Stadia Maps</a> &copy; <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+	ext: 'png'
+}).addTo(map);
+
+
+        var osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        });
+
+        var satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+        });
+
+        
+
+        // Initialize empty layer groups for each category
+        var layers = {
+            'Schutz vor Wasser/Hitze/Sturm': L.layerGroup().addTo(map),
+            'Schutz vor Wasser/Hitze': L.layerGroup().addTo(map),
+            'Schutz vor Wasser': L.layerGroup().addTo(map),
+            'Schutz vor Hitze': L.layerGroup().addTo(map),
+            'Sonstiges': L.layerGroup().addTo(map)
+        };
+
+        // Define icons
+        var icons = {
+            'Schutz vor Wasser/Hitze/Sturm': L.icon({
+                iconUrl: 'icons/WHS.png',
+                iconSize: [25, 25]
+            }),
+            'Schutz vor Wasser/Hitze': L.icon({
+                iconUrl: 'icons/WH.png',
+                iconSize: [25, 25]
+            }),
+            'Schutz vor Wasser': L.icon({
+                iconUrl: 'icons/W.png',
+                iconSize: [25, 25]
+            }),
+            'Schutz vor Hitze': L.icon({
+                iconUrl: 'icons/H.png',
+                iconSize: [25, 25]
+            }),
+            'Sonstiges': L.icon({
+                iconUrl: 'icons/So.png',
+                iconSize: [25, 25]
+            })
+        };
+
+        var IconUnternehmen = L.icon({            
+                iconUrl: 'icons/u1.png',
+                iconSize: [15, 15]
+            }); 
+
+        var unternehmLayerGroup = L.layerGroup().addTo(map);
+
+        // Function to determine the correct icon and layer for a feature
+        function addFeatureToLayer(feature, latlng) {
+            var category = feature.properties.Abschnitt2;
+            var art = feature.properties.art;
+            var layer = layers[category];
+            var icon = icons[category];
+
+            if (layer && icon) {
+
+                var imageUrl = feature.properties["Fotos und Dateien"];
+                var title = feature.properties["Titel"];
+               var linkUrl = feature.properties["Abschnitt5"];
+               
+                var popupContent = `
+                    ${imageUrl ? `<img src="${imageUrl}" alt="Image" style="max-width:100%;"><br>` : ''}
+                    <h3>${feature.properties.art || ''}</h3>
+                    <p>${feature.properties.Description || ''}</p>
+                    <p> ${category}</p>
+                    
+                 ${title ? `<h4>${title}</h4>` : ''}
+                 ${linkUrl ? `Den Steckbrief zum Best-Practice-Beispiel finden Sie <a href="${linkUrl}" target="_blank">hier</a>` : ''}
+        
+                `;
+                
+                var objectId = feature.properties.FID; // 
+                var attachmentUrl = `https://services-eu1.arcgis.com/LfSKGlfoQR87IDEq/arcgis/rest/services/bestpractise/FeatureServer/0/${objectId}/attachments`;
+
+                fetch(attachmentUrl)
+                    .then(response => response.json()) // Try to parse JSON directly
+                    .then(data => {
+                        if (data.attachmentInfos && data.attachmentInfos.length > 0) {
+                            var attachments = data.attachmentInfos.map(info => {
+                                var fileUrl = `${attachmentUrl}/${info.id}`;
+                                if (info.contentType.startsWith('image/')) {
+                                    return `<img src="${fileUrl}" alt="Image" />`;
+                                } else {
+                                    return `<a href="${fileUrl}" target="_blank">View ${info.name}</a>`;
+                                }
+                            }).join('<br>');
+
+                            popupContent += `<div>${attachments}</div>`;
+                        } else {
+                            popupContent += `<p></p>`;
+                        }
+                        
+                        var marker = L.marker(latlng, { icon: icon }).bindPopup(popupContent);
+                        layer.addLayer(marker);
+                    })
+                    .catch(error => {
+                        console.error('Error fetching attachments:', error);
+                        var marker = L.marker(latlng, { icon: icon }).bindPopup(popupContent + '<p>Error fetching attachments</p>');
+                        layer.addLayer(marker);
+                    });
+            } else {
+                console.error("Unrecognized category or missing icon for:", category);
+            }
+        }
+
+        // Feature layer from ArcGIS
+        var featureLayer = L.esri.featureLayer({
+            url: 'https://services-eu1.arcgis.com/LfSKGlfoQR87IDEq/arcgis/rest/services/bestpractise/FeatureServer/0',
+            pointToLayer: function(geojson, latlng) {
+                addFeatureToLayer(geojson, latlng);
+            }
+        });
+
+        var additionalLayer = L.esri.featureLayer({
+    url: 'https://services-eu1.arcgis.com/LfSKGlfoQR87IDEq/arcgis/rest/services/Anbieter/FeatureServer/0',
+    pointToLayer: function(geojson, latlng) {
+        var properties = geojson.properties;
+        
+        // Customize the pop-up content
+        var popupContent = `
+            <h3>${properties.Lösungsanbietende || 'No Name'}</h3>
+            <p><strong></strong> ${properties.Postadresse || 'No Type'}</p>
+            <p><strong>Website:</strong> ${properties.Website_URL ? `<a href="${properties.Website_URL}" target="_blank">${properties.Website_URL}</a>` : 'No Website'}</p>
+            <p><strong>Best-Practice Beispiel</strong> ${properties.Titel || 'No Address'}</p>
+            
+        `;
+        
+        // Create the marker with the icon and pop-up
+        var marker = L.marker(latlng, { icon: IconUnternehmen }).bindPopup(popupContent);
+        return marker;
+    }
+}).addTo(unternehmLayerGroup);
+
+var NkuBaseMap = L.esri.featureLayer({
+    url: 'https://services-eu1.arcgis.com/LfSKGlfoQR87IDEq/arcgis/rest/services/L%C3%A4nder_Klimaprofit/FeatureServer/0',
+    style: function (feature) {
+        // You can dynamically set the style based on feature properties if needed
+        return {
+            color: "#999897",        // Border (stroke) color
+            weight: 2,               // Border thickness
+            opacity: 1,              // Border opacity (0 = transparent, 1 = solid)
+            fillColor: "#999897",     // Fill color of the polygons
+            fillOpacity: 0.6          // Fill opacity (0 = transparent, 1 = solid)
+        };
+    }
+}).addTo(map);
+
+        var baseMaps = {
+            "Topographisch": Stadia_AlidadeSmooth,
+            "Satellite": satellite
+        };
+
+        // Add icons to the category names in the overlayMaps object
+        var overlayMaps = {
+            '<span style="background-image: url(\'icons/WHS.png\');"></span> Schutz vor Wasser/Hitze/Sturm': layers['Schutz vor Wasser/Hitze/Sturm'],
+            '<span style="background-image: url(\'icons/WH.png\');"></span> Schutz vor Wasser/Hitze': layers['Schutz vor Wasser/Hitze'],
+            '<span style="background-image: url(\'icons/W.png\');"></span> Schutz vor Wasser': layers['Schutz vor Wasser'],
+            '<span style="background-image: url(\'icons/H.png\');"></span> Schutz vor Hitze': layers['Schutz vor Hitze'],
+            '<span style="background-image: url(\'icons/So.png\');"></span> Sonstiges': layers['Sonstiges'],
+            '<span style="background-image: url(\'icons/u1.png\');"></span> Anbietende Unternehmen': unternehmLayerGroup
+                };
+
+           
+
+        L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
+
+        // Load features onto the map
+        featureLayer.addTo(map);
+
+    </script>
+</body>
+</html>
+
